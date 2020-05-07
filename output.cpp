@@ -38,13 +38,50 @@
 #include <cerrno>
 #include "rtl_airband.h"
 #include "input-common.h"
+#define LONGEST_IP 39+1
 
+int probably_ip(char* hostname) {
+	int len = strlen(hostname);
+	bool maybeipv4 = true;
+	for(int i = 0; i < len; i++) {
+		if(!isdigit(hostname[i]) && (hostname[i] != '.')) {
+			maybeipv4 = false;
+		}	
+	}
+	if(maybeipv4) {
+		return maybeipv4;
+	}
+	bool maybeipv6 = true;
+	for(int i = 0; i < len; i++) {
+		if(!isalpha(hostname[i] && !isdigit(hostname[i]) && (hostname[i] != ':')) {
+			maybeipv6 = false;
+		}
+	}	
+	return maybeipv6 || maybeipv4;
+}
 void shout_setup(icecast_data *icecast, mix_modes mixmode) {
 	int ret;
 	shout_t * shouttemp = shout_new();
 	if (shouttemp == NULL) {
 		printf("cannot allocate\n");
 	}
+	if(!probably_ip(icecast->hostname)) {
+		struct hostent *he;
+		he = gethostbyname(icecast->hostname);
+		if(!he)
+			goto giveup;
+		addr_list = (struct in_addr**)he->h_addr_list;
+		char *addr = malloc(LONGEST_IP);
+		addr[LONGEST_IP - 1] = '\0';
+		if(!addr_list[0]) {
+			free(addr);
+			goto giveup;
+		}
+		strcpy(addr, inet_ntoa(*addr_list[0]));
+		free(icecast->hostname);
+		icecast->hostname = addr;
+	}
+	giveup:
 	if (shout_set_host(shouttemp, icecast->hostname) != SHOUTERR_SUCCESS) {
 		shout_free(shouttemp); return;
 	}
